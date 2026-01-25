@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <title>Excel AI Assistant</title>
+
+    <!-- Office.js -->
+    <script src="https://appsforoffice.microsoft.com/lib/1.1/hosted/office.js"></script>
+
+    <!-- Fluent UI Icons -->
+    <link
+      rel="stylesheet"
+      href="https://static2.sharepointonline.com/files/fabric/office-ui-fabric-core/11.0.0/css/fabric.min.css"
+    />
+  </head>
+  <body>
+    <div id="app" class="app">
+      <!-- Header minimalista -->
+      <header class="header">
+        <div class="header-left">
+          <select id="modelSelector" class="model-select" title="Seleccionar modelo">
+            <option value="gpt-4o" selected>GPT-4o</option>
+          </select>
+          <span class="alpha-badge">Alpha</span>
+        </div>
+        <div class="header-right">
+          <button id="clearHistoryBtn" class="header-btn" title="Nueva conversación">
+            <i class="ms-Icon ms-Icon--Add" aria-hidden="true"></i>
+          </button>
+        </div>
+      </header>
+
+      <!-- Logo Chevyplan -->
+      <div class="logo-container">
+        <img
+          src="https://www.chevyplan.com.ec/wp-content/uploads/2025/10/wb_chevyplan_logo-financiamiento-b_v5.webp"
+          alt="Chevyplan"
+          class="chevyplan-logo"
+        />
+      </div>
+
+      <!-- Area de mensajes -->
+      <main id="messagesContainer" class="messages">
+        <div class="welcome">
+          <div class="welcome-icon excel-green">
+            <i class="ms-Icon ms-Icon--ExcelDocument" aria-hidden="true"></i>
+          </div>
+          <p class="welcome-text">
+            Tu asistente de IA para análisis de datos, fórmulas y automatización en Excel.
+          </p>
+          <p class="welcome-examples-text">
+            <strong>Prueba:</strong> "Crea un calendario", "Fórmula de IVA 15%", "Analiza mis datos"
+          </p>
+        </div>
+      </main>
+
+      <!-- Barra de acciones pendientes -->
+      <div id="pendingActions" class="pending-actions hidden">
+        <div class="pending-info">
+          <i class="ms-Icon ms-Icon--Edit" aria-hidden="true"></i>
+          <span id="pendingCount">3 ediciones pendientes</span>
+        </div>
+        <button id="acceptAllBtn" class="accept-btn">Aceptar todo</button>
+      </div>
+
+      <!-- Área de entrada unificada -->
+      <footer class="input-area">
+        <div class="unified-input-box">
+          <!-- Zona de texto -->
+          <div class="input-text-zone">
+            <textarea
+              id="userInput"
+              class="input-field"
+              placeholder="Pregunta algo..."
+              rows="1"
+              aria-label="Mensaje"
+            ></textarea>
+          </div>
+          
+          <!-- Zona de botones -->
+          <div class="input-buttons-zone">
+            <div class="buttons-left">
+              <button id="moreOptionsBtn" class="icon-btn" title="Más opciones">
+                <i class="ms-Icon ms-Icon--Add" aria-hidden="true"></i>
+              </button>
+              <div id="webActiveIndicator" class="active-indicator" style="display: none;" title="Búsqueda web activa">
+                <i class="ms-Icon ms-Icon--Globe" aria-hidden="true"></i>
+              </div>
+              <div id="ragActiveIndicator" class="active-indicator" style="display: none;" title="RAG activo">
+                <i class="ms-Icon ms-Icon--Database" aria-hidden="true"></i>
+              </div>
+              <div class="edit-mode-toggle" id="editModeToggle" title="Modo de edición">
+                <i class="ms-Icon ms-Icon--CheckMark" id="editModeIcon" aria-hidden="true"></i>
+                <span id="editModeText">Auto</span>
+                <i class="ms-Icon ms-Icon--ChevronDown edit-mode-chevron" aria-hidden="true"></i>
+              </div>
+            </div>
+            <div class="buttons-right">
+              <div id="selectionBar" class="selection-bar">
+                <i class="ms-Icon ms-Icon--CellPhone" aria-hidden="true"></i>
+                <span id="selectionText">A1</span>
+              </div>
+              <button id="sendBtn" class="send-btn" disabled title="Enviar">
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <line x1="22" y1="2" x2="11" y2="13"></line>
+                  <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      </footer>
+
+      <!-- Toast -->
+      <div id="toast" class="toast hidden">
+        <span class="toast-msg"></span>
+      </div>
+
+      <!-- Footer de créditos -->
+      <div class="credits">Desarrollado por ChevyplanIT</div>
+    </div>
+
+    <script src="taskpane.bundle.js"></script>
+  </body>
+</html>

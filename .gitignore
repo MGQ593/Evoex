@@ -1,0 +1,103 @@
+# Dependencies
+node_modules/
+package-lock.json
+yarn.lock
+
+# Build output
+dist/
+build/
+*.bundle.js
+*.bundle.js.map
+
+# Proxy server (proyecto separado, no incluir en el complemento)
+searxng-proxy/
+
+# Environment variables - IMPORTANTE: nunca subir credenciales
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.env
+
+# Archivo generado por webpack con credenciales - NUNCA SUBIR
+src/config/env.generated.ts
+
+# IDE and editors
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.project
+.classpath
+.settings/
+
+# Visual Studio
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.vssscc
+*.vspscc
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Testing
+coverage/
+.nyc_output/
+
+# TypeScript
+*.tsbuildinfo
+
+# SSL certificates for local development
+*.crt
+*.key
+*.pem
+certs/
+
+# Office Add-in specific
+~$*.xlsx
+~$*.xls
+*.tmp
+
+# Cache
+.cache/
+.temp/
+.npm/
+
+# Optional npm cache directory
+.npm
+
+# Optional eslint cache
+.eslintcache
+
+# Microbundle cache
+.rpt2_cache/
+.rts2_cache_cjs/
+.rts2_cache_es/
+.rts2_cache_umd/
+
+# Claude Code
+.claude/
+
+# Archivos temporales
+nul
+docs/
+DOCUMENTACION.md
