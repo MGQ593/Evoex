@@ -1657,14 +1657,56 @@ function formatRankCell(cell: string, rowIndex: number): string {
 
 // ===== Actions Card =====
 
-function createActionsCard(actions: ExcelAction[], results?: ActionResult[]): string {
+// Estado de reintentos por acción
+interface RetryState {
+  attempt: number;
+  maxAttempts: number;
+  isRetrying: boolean;
+}
+
+const actionRetryStates: Map<string, RetryState> = new Map();
+
+function getActionKey(action: ExcelAction, index: number): string {
+  return `${action.type}-${action.range}-${index}`;
+}
+
+function createActionsCard(
+  actions: ExcelAction[],
+  results?: ActionResult[],
+  retryStates?: Map<string, RetryState>
+): string {
   if (!actions || actions.length === 0) return "";
 
   let html = '<div class="actions-card">';
 
   actions.forEach((action, index) => {
     const result = results?.[index];
-    const statusClass = result ? (result.success ? "success" : "error") : "pending";
+    const actionKey = getActionKey(action, index);
+    const retryState = retryStates?.get(actionKey);
+
+    // Determinar clase de estado
+    let statusClass = "pending";
+    let statusText = "";
+    let retryInfo = "";
+
+    if (retryState?.isRetrying) {
+      statusClass = "retrying";
+      statusText = `<span class="action-retry-status">Reintentando (${retryState.attempt}/${retryState.maxAttempts})...</span>`;
+    } else if (result) {
+      if (!result.success) {
+        statusClass = "error";
+        statusText = "";
+      } else if (result.validated && !result.validationPassed) {
+        statusClass = "validation-failed";
+        statusText = `<span class="action-retry-status">Validación fallida</span>`;
+        if (result.validationMessage) {
+          retryInfo = `<br><strong style="color:#f59e0b">Validación:</strong> ${result.validationMessage}`;
+        }
+      } else {
+        statusClass = "success";
+      }
+    }
+
     const description = action.description || `${action.type}`;
 
     // Show error message if failed
@@ -1672,7 +1714,21 @@ function createActionsCard(actions: ExcelAction[], results?: ActionResult[]): st
       ? `<br><strong style="color:#d32f2f">Error:</strong> ${result.error}`
       : '';
 
-    html += `<div class="action-item"><div class="action-row" data-index="${index}"><div class="action-indicator ${statusClass}"></div><span class="action-text">${description}</span><span class="action-range">${action.range}</span><i class="ms-Icon ms-Icon--ChevronDown action-chevron"></i></div><div class="action-details"><strong>Tipo:</strong> ${action.type}<br><strong>Rango:</strong> ${action.range}${result ? `<br><strong>Estado:</strong> ${result.success ? 'Completado' : 'Falló'}` : ''}${errorInfo}</div></div>`;
+    html += `<div class="action-item" data-action-key="${actionKey}">
+      <div class="action-row" data-index="${index}">
+        <div class="action-indicator ${statusClass}"></div>
+        <span class="action-text">${description}${statusText}</span>
+        <span class="action-range">${action.range}</span>
+        <i class="ms-Icon ms-Icon--ChevronDown action-chevron"></i>
+      </div>
+      <div class="action-details">
+        <strong>Tipo:</strong> ${action.type}<br>
+        <strong>Rango:</strong> ${action.range}
+        ${result ? `<br><strong>Estado:</strong> ${result.success ? 'Completado' : 'Falló'}` : ''}
+        ${result?.validated ? `<br><strong>Validado:</strong> ${result.validationPassed ? 'Sí' : 'No'}` : ''}
+        ${errorInfo}${retryInfo}
+      </div>
+    </div>`;
   });
 
   html += '</div>';
@@ -1991,6 +2047,9 @@ function updateAcceptButtonState(): void {
   }
 }
 
+// Máximo número de reintentos por validación fallida
+const MAX_VALIDATION_RETRIES = 3;
+
 async function acceptAllActions(): Promise<void> {
   if (state.pendingActions.length === 0) return;
 
@@ -2003,55 +2062,62 @@ async function acceptAllActions(): Promise<void> {
     const successCount = results.filter(r => r.success).length;
     const errorCount = results.length - successCount;
 
+    // Detectar fallos de validación (éxito técnico pero datos no escritos)
+    const validationFailures = results.filter(r =>
+      r.success && r.validated && !r.validationPassed
+    );
+
     // Update the last message with results
     const lastMessage = el.messagesContainer().querySelector(".message.assistant:last-child .message-bubble");
     if (lastMessage) {
       const actionsCard = lastMessage.querySelector(".actions-card");
       if (actionsCard) {
-        actionsCard.outerHTML = createActionsCard(state.pendingActions, results);
+        actionsCard.outerHTML = createActionsCard(state.pendingActions, results, actionRetryStates);
         setupActionRowListeners(lastMessage as HTMLElement);
       }
     }
 
-    if (errorCount === 0) {
-      showToast(`${successCount} acciones completadas`, "success");
-
-      // Highlight first range
-      if (results.length > 0 && results[0].success) {
-        try {
-          await excelService.highlightRange(results[0].action.range, 1500);
-        } catch {
-          // Ignore highlight errors
-        }
-      }
-      
-      // Verificación post-ejecución: comprobar si hay fórmulas con resultados anómalos
-      const formulaActions = state.pendingActions.filter(a => a.type === "formula");
-      if (formulaActions.length > 0) {
-        // Dar tiempo a Excel para calcular las fórmulas
-        await new Promise(resolve => setTimeout(resolve, 500));
-        
-        // Verificar resultados
-        const verificationResult = await verifyFormulaResults(formulaActions);
-        if (verificationResult.needsCorrection) {
-          showToast("⚠️ Detectados resultados anómalos, solicitando corrección...", "info");
-          setLoading(false);
-          hidePendingActions();
-          
-          // Solicitar corrección con el feedback
-          await requestResultCorrection(formulaActions, verificationResult.feedback, state.lastUserMessage || "");
-          return;
-        }
-      }
-    } else {
+    // Primero manejar errores técnicos
+    if (errorCount > 0) {
       showToast(`${successCount} OK, ${errorCount} errores - reintentando...`, "info");
+      setLoading(false);
+      requestErrorCorrection(results);
+      return;
+    }
 
-      // Solicitar corrección al modelo
-      // NO llamamos hidePendingActions() aquí ni en finally
-      // porque requestErrorCorrection se encarga del flujo completo
-      setLoading(false); // Liberar loading antes de la corrección
-      requestErrorCorrection(results); // Sin await - maneja su propio flujo
-      return; // Salir sin ejecutar finally
+    // Luego manejar fallos de validación
+    if (validationFailures.length > 0) {
+      const handled = await handleValidationFailures(validationFailures, results);
+      if (handled) {
+        return; // El flujo de reintento se encarga del resto
+      }
+    }
+
+    // Todo exitoso
+    showToast(`${successCount} acciones completadas`, "success");
+
+    // Highlight first range
+    if (results.length > 0 && results[0].success) {
+      try {
+        await excelService.highlightRange(results[0].action.range, 1500);
+      } catch {
+        // Ignore highlight errors
+      }
+    }
+
+    // Verificación post-ejecución: comprobar si hay fórmulas con resultados anómalos
+    const formulaActions = state.pendingActions.filter(a => a.type === "formula");
+    if (formulaActions.length > 0) {
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      const verificationResult = await verifyFormulaResults(formulaActions);
+      if (verificationResult.needsCorrection) {
+        showToast("⚠️ Detectados resultados anómalos, solicitando corrección...", "info");
+        setLoading(false);
+        hidePendingActions();
+        await requestResultCorrection(formulaActions, verificationResult.feedback, state.lastUserMessage || "");
+        return;
+      }
     }
 
   } catch (error) {
@@ -2061,9 +2127,131 @@ async function acceptAllActions(): Promise<void> {
     setLoading(false);
   }
 
-  // Solo limpiar si no hubo errores (no entramos al else anterior)
+  // Limpiar estados de reintento al finalizar exitosamente
+  actionRetryStates.clear();
   hidePendingActions();
   setLoading(false);
+}
+
+/**
+ * Maneja los fallos de validación con reintentos automáticos
+ */
+async function handleValidationFailures(
+  validationFailures: ActionResult[],
+  allResults: ActionResult[]
+): Promise<boolean> {
+  // Verificar intentos de reintento para cada acción fallida
+  const actionsToRetry: ActionResult[] = [];
+
+  for (const failure of validationFailures) {
+    const actionIndex = allResults.indexOf(failure);
+    const action = failure.action;
+    const actionKey = getActionKey(action, actionIndex);
+
+    // Obtener o crear estado de reintento
+    let retryState = actionRetryStates.get(actionKey);
+    if (!retryState) {
+      retryState = { attempt: 0, maxAttempts: MAX_VALIDATION_RETRIES, isRetrying: false };
+      actionRetryStates.set(actionKey, retryState);
+    }
+
+    if (retryState.attempt < MAX_VALIDATION_RETRIES) {
+      retryState.attempt++;
+      retryState.isRetrying = true;
+      actionsToRetry.push(failure);
+      console.log(`[Validación] Reintento ${retryState.attempt}/${MAX_VALIDATION_RETRIES} para ${actionKey}`);
+    } else {
+      retryState.isRetrying = false;
+      console.warn(`[Validación] Máximo de reintentos alcanzado para ${actionKey}`);
+    }
+  }
+
+  if (actionsToRetry.length === 0) {
+    // No hay más reintentos disponibles
+    showToast("⚠️ Algunas acciones no se completaron correctamente", "error");
+    return false;
+  }
+
+  // Actualizar UI para mostrar estado de reintento
+  const lastMessage = el.messagesContainer().querySelector(".message.assistant:last-child .message-bubble");
+  if (lastMessage) {
+    const actionsCard = lastMessage.querySelector(".actions-card");
+    if (actionsCard) {
+      actionsCard.outerHTML = createActionsCard(state.pendingActions, allResults, actionRetryStates);
+      setupActionRowListeners(lastMessage as HTMLElement);
+    }
+  }
+
+  showToast(`Reintentando ${actionsToRetry.length} acción(es)...`, "info");
+  setLoading(false);
+
+  // Solicitar corrección al modelo
+  await requestValidationCorrection(actionsToRetry);
+  return true;
+}
+
+/**
+ * Solicita al modelo que corrija las acciones que fallaron validación
+ */
+async function requestValidationCorrection(failedValidations: ActionResult[]): Promise<void> {
+  const validationDetails = failedValidations.map(r => {
+    const retryState = actionRetryStates.get(
+      getActionKey(r.action, state.pendingActions.indexOf(r.action))
+    );
+    return `- Acción "${r.action.type}" en ${r.action.range}:
+    Mensaje: ${r.validationMessage || "Datos no escritos"}
+    Valores actuales: ${r.actualValues ? JSON.stringify(r.actualValues.slice(0, 3)) + "..." : "vacío"}
+    Intento: ${retryState?.attempt || 1}/${MAX_VALIDATION_RETRIES}`;
+  }).join("\n\n");
+
+  const correctionRequest = `[VALIDACIÓN FALLIDA - DATOS NO ESCRITOS]
+Las siguientes acciones se ejecutaron sin error técnico, pero los datos no se escribieron correctamente en Excel:
+
+${validationDetails}
+
+IMPORTANTE:
+1. La acción NO produjo error, pero las celdas están vacías o con valores incorrectos
+2. Esto puede ocurrir por:
+   - Rango incorrecto o fuera del área visible
+   - Valores en formato incorrecto
+   - Conflicto con protección de celdas
+   - El rango ya tenía datos y se movió a otro lugar
+
+Por favor, genera las acciones corregidas asegurándote de:
+1. Usar rangos válidos y accesibles
+2. Verificar que el formato de datos sea correcto
+3. Si es una tabla de datos, usa "values" como array 2D correcto
+
+Solicitud original del usuario: ${state.lastUserMessage || "No disponible"}`;
+
+  setLoading(true);
+
+  try {
+    const response = await azureOpenAIService.sendMessageStructured(correctionRequest, undefined);
+
+    if (response.actions && response.actions.length > 0) {
+      state.pendingActions = response.actions;
+
+      addMessage("assistant", response.message, response.actions);
+      showPendingActions(response.actions);
+
+      if (state.editMode === "auto") {
+        await new Promise(resolve => setTimeout(resolve, 300));
+        await acceptAllActions();
+      } else {
+        setLoading(false);
+      }
+    } else {
+      // El modelo no generó acciones de corrección
+      addMessage("assistant", response.message);
+      showToast("No se pudo generar corrección automática", "error");
+      setLoading(false);
+    }
+  } catch (error) {
+    console.error("Error solicitando corrección de validación:", error);
+    showToast("Error al solicitar corrección", "error");
+    setLoading(false);
+  }
 }
 
 /**

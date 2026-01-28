@@ -547,6 +547,11 @@ export interface ActionResult {
   message: string;
   error?: string;
   readData?: ReadResult;  // Datos leídos si la acción fue "read"
+  // Campos de validación post-ejecución
+  validated?: boolean;           // ¿Se realizó validación?
+  validationPassed?: boolean;    // ¿Pasó la validación?
+  validationMessage?: string;    // Detalle de qué falló
+  actualValues?: CellValue[][];  // Valores reales después de ejecutar
 }
 
 /**
@@ -2505,10 +2510,28 @@ export class ExcelService {
         await context.sync();
       });
 
+      // === VALIDACIÓN POST-EJECUCIÓN ===
+      // Para acciones de escritura, verificar que los datos se escribieron correctamente
+      if (action.type === "write" || action.type === "formula") {
+        const validationResult = await this.validateWriteAction(action, finalRange);
+
+        return {
+          success: true,
+          action,
+          message,
+          validated: true,
+          validationPassed: validationResult.passed,
+          validationMessage: validationResult.message,
+          actualValues: validationResult.actualValues,
+        };
+      }
+
+      // Para otras acciones, no hay validación específica
       return {
         success: true,
         action,
         message,
+        validated: false,
       };
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : "Error desconocido";
@@ -2519,6 +2542,110 @@ export class ExcelService {
         action,
         message: `Error en ${action.range}`,
         error: errorMsg,
+        validated: false,
+      };
+    }
+  }
+
+  /**
+   * Valida que una acción de escritura haya sido exitosa
+   */
+  private async validateWriteAction(
+    action: ExcelAction,
+    finalRange: string
+  ): Promise<{ passed: boolean; message: string; actualValues?: CellValue[][] }> {
+    try {
+      let actualValues: CellValue[][] = [];
+
+      await Excel.run(async (context: ExcelContext) => {
+        const sheet = context.workbook.worksheets.getActiveWorksheet();
+
+        // Determinar el rango a verificar
+        let verifyRange: string;
+        if (action.type === "write" && action.values) {
+          const numRows = action.values.length;
+          const numCols = action.values[0]?.length || 1;
+          const startAddress = finalRange.split(":")[0];
+          const startCell = sheet.getRange(startAddress);
+          const targetRange = startCell.getResizedRange(numRows - 1, numCols - 1);
+          targetRange.load("values, address");
+          await context.sync();
+          actualValues = targetRange.values as CellValue[][];
+          verifyRange = targetRange.address;
+        } else if (action.type === "formula") {
+          const range = sheet.getRange(finalRange);
+          range.load("values, address");
+          await context.sync();
+          actualValues = range.values as CellValue[][];
+          verifyRange = range.address;
+        } else {
+          verifyRange = finalRange;
+        }
+
+        console.log(`[Validación] Rango: ${verifyRange}, Valores:`, actualValues);
+      });
+
+      // Verificar si hay datos en las celdas
+      let hasData = false;
+      let emptyCount = 0;
+      let totalCells = 0;
+
+      for (const row of actualValues) {
+        for (const cell of row) {
+          totalCells++;
+          if (cell !== null && cell !== "" && cell !== undefined) {
+            hasData = true;
+          } else {
+            emptyCount++;
+          }
+        }
+      }
+
+      // Determinar si la validación pasó
+      const expectedData = action.type === "write"
+        ? (action.values && action.values.length > 0)
+        : (action.formula || (action.formulas && action.formulas.length > 0));
+
+      if (expectedData && !hasData) {
+        // Se esperaban datos pero no hay ninguno
+        return {
+          passed: false,
+          message: `No se escribieron datos en ${finalRange}. Celdas vacías: ${emptyCount}/${totalCells}`,
+          actualValues,
+        };
+      }
+
+      // Si hay datos, verificar que no sean todos errores (para fórmulas)
+      if (action.type === "formula") {
+        let errorCount = 0;
+        for (const row of actualValues) {
+          for (const cell of row) {
+            const cellStr = String(cell || "");
+            if (cellStr.startsWith("#") && (cellStr.includes("ERROR") || cellStr.includes("REF") || cellStr.includes("VALUE") || cellStr.includes("NAME") || cellStr.includes("DIV"))) {
+              errorCount++;
+            }
+          }
+        }
+        if (errorCount > 0 && errorCount === totalCells) {
+          return {
+            passed: false,
+            message: `Todas las fórmulas resultaron en error (${errorCount} errores)`,
+            actualValues,
+          };
+        }
+      }
+
+      return {
+        passed: true,
+        message: `Validación exitosa: ${totalCells - emptyCount}/${totalCells} celdas con datos`,
+        actualValues,
+      };
+
+    } catch (error) {
+      console.error("[Validación] Error al validar:", error);
+      return {
+        passed: true, // En caso de error de validación, asumir que pasó
+        message: "No se pudo validar la acción",
       };
     }
   }

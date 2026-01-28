@@ -729,6 +729,27 @@ body {
   background: var(--error);
 }
 
+.action-indicator.retrying {
+  background: #f59e0b;
+  animation: pulse-retrying 1s ease-in-out infinite;
+}
+
+.action-indicator.validation-failed {
+  background: #f59e0b;
+}
+
+@keyframes pulse-retrying {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.6; transform: scale(1.2); }
+}
+
+.action-retry-status {
+  font-size: 11px;
+  color: #f59e0b;
+  margin-left: 4px;
+  font-weight: 500;
+}
+
 .action-text {
   flex: 1;
   font-size: 13px;
