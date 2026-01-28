@@ -51,9 +51,19 @@ export async function getUserInfo(): Promise<UserInfo> {
  * Intenta obtener el usuario via SSO de Office
  */
 async function tryGetUserFromSSO(): Promise<UserInfo | null> {
-  if (typeof Office === 'undefined' || !Office.auth) {
+  console.log('[SSO] Iniciando intento de SSO...');
+
+  if (typeof Office === 'undefined') {
+    console.log('[SSO] Office no está definido');
     return null;
   }
+
+  if (!Office.auth) {
+    console.log('[SSO] Office.auth no está disponible');
+    return null;
+  }
+
+  console.log('[SSO] Office.auth disponible, solicitando token...');
 
   try {
     // Solicitar token de acceso
@@ -63,24 +73,29 @@ async function tryGetUserFromSSO(): Promise<UserInfo | null> {
       forMSGraphAccess: false // No necesitamos Graph, solo el token básico
     });
 
+    console.log('[SSO] Token obtenido:', token ? 'Sí (longitud: ' + token.length + ')' : 'No');
+
     if (!token) {
       return null;
     }
 
     // Decodificar el JWT para obtener claims del usuario
     const userInfo = decodeJwtPayload(token);
+    console.log('[SSO] Claims del token:', userInfo);
 
     if (userInfo) {
-      return {
+      const result = {
         name: userInfo.name || userInfo.preferred_username || 'Usuario',
         email: userInfo.preferred_username || userInfo.upn || userInfo.email || '',
         firstName: getFirstName(userInfo.name || userInfo.preferred_username || 'Usuario'),
         isAuthenticated: true,
-        source: 'sso'
+        source: 'sso' as const
       };
+      console.log('[SSO] Usuario obtenido:', result);
+      return result;
     }
-  } catch {
-    // SSO error - continuará con fallback
+  } catch (error) {
+    console.error('[SSO] Error:', error);
   }
 
   return null;
