@@ -3164,23 +3164,16 @@ function startApp(): void {
 }
 
 /**
- * Si se accede fuera de Excel, mostrar mensaje de error
+ * Si se accede fuera de Excel, mostrar 404
  */
 function showOfficeRequiredError(): void {
   document.body.innerHTML = `
-    <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;font-family:system-ui;background:#f5f5f5;color:#333;text-align:center;padding:20px;">
-      <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#01549A" stroke-width="2">
-        <path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
-      </svg>
-      <h1 style="margin:20px 0 10px;font-size:24px;">Evoex</h1>
-      <p style="margin:0 0 20px;color:#666;max-width:400px;">
-        Este complemento solo funciona dentro de Microsoft Excel.
-      </p>
-      <p style="margin:0;font-size:14px;color:#888;">
-        Abre Excel y carga el complemento desde el menú Insertar → Complementos
-      </p>
+    <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;font-family:system-ui;background:#fff;color:#333;text-align:center;">
+      <h1 style="font-size:72px;margin:0;color:#ccc;">404</h1>
+      <p style="margin:10px 0 0;color:#999;">Not Found</p>
     </div>
   `;
+  document.title = "404 Not Found";
 }
 
 startApp();
