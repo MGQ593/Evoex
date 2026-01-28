@@ -71,8 +71,8 @@
           <FunctionFile resid="Taskpane.Url"/>
 
           <ExtensionPoint xsi:type="PrimaryCommandSurface">
-            <CustomTab id="ExcelAITab">
-              <Group id="ExcelAIGroup">
+            <OfficeTab id="TabHome">
+              <Group id="EvoexGroup">
                 <Label resid="CommandsGroup.Label"/>
                 <Icon>
                   <bt:Image size="16" resid="Icon.16x16"/>
@@ -96,8 +96,7 @@
                   </Action>
                 </Control>
               </Group>
-              <Label resid="TabLabel"/>
-            </CustomTab>
+            </OfficeTab>
           </ExtensionPoint>
 
         </DesktopFormFactor>
@@ -117,7 +116,6 @@
       </bt:Urls>
       <bt:ShortStrings>
         <bt:String id="GetStarted.Title" DefaultValue="Evoex"/>
-        <bt:String id="TabLabel" DefaultValue="Evoex"/>
         <bt:String id="CommandsGroup.Label" DefaultValue="Evoex"/>
         <bt:String id="TaskpaneButton.Label" DefaultValue="Abrir Evoex"/>
       </bt:ShortStrings>
