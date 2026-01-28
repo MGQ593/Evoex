@@ -1,5 +1,9 @@
 /**
  * User Service - Obtiene información del usuario de Office 365
+ *
+ * NOTA: SSO deshabilitado temporalmente porque Admin Center no soporta
+ * la configuración WebApplicationInfo en el manifest.
+ * El código SSO se mantiene comentado para habilitarlo en el futuro.
  */
 
 export interface UserInfo {
@@ -13,39 +17,38 @@ export interface UserInfo {
 // Cache del usuario
 let cachedUser: UserInfo | null = null;
 
+// Flag para habilitar/deshabilitar SSO (deshabilitado por ahora)
+const SSO_ENABLED = false;
+
 /**
  * Obtiene información del usuario actual de Office 365
- * Intenta SSO primero, luego fallback
  */
 export async function getUserInfo(): Promise<UserInfo> {
-  console.log('[UserService] getUserInfo() llamado');
-
   // Retornar cache si existe
   if (cachedUser) {
-    console.log('[UserService] Retornando usuario cacheado:', cachedUser);
     return cachedUser;
   }
 
-  console.log('[UserService] No hay cache, intentando SSO...');
-
-  // Intentar SSO primero
-  try {
-    const ssoUser = await tryGetUserFromSSO();
-    if (ssoUser) {
-      cachedUser = ssoUser;
-      return ssoUser;
+  // Intentar SSO si está habilitado
+  if (SSO_ENABLED) {
+    try {
+      const ssoUser = await tryGetUserFromSSO();
+      if (ssoUser) {
+        cachedUser = ssoUser;
+        return ssoUser;
+      }
+    } catch (error) {
+      console.warn('[UserService] SSO no disponible');
     }
-  } catch (error) {
-    console.error('[UserService] Error en SSO:', error);
   }
 
-  // Fallback: usuario desconocido
+  // Fallback: usuario genérico
   const fallbackUser: UserInfo = {
     name: 'Usuario',
     email: '',
     firstName: 'Usuario',
     isAuthenticated: false,
-    source: 'unknown'
+    source: 'fallback'
   };
 
   cachedUser = fallbackUser;
@@ -54,53 +57,37 @@ export async function getUserInfo(): Promise<UserInfo> {
 
 /**
  * Intenta obtener el usuario via SSO de Office
+ * (Deshabilitado - requiere configuración WebApplicationInfo en manifest)
  */
 async function tryGetUserFromSSO(): Promise<UserInfo | null> {
-  console.log('[SSO] Iniciando intento de SSO...');
-
-  if (typeof Office === 'undefined') {
-    console.log('[SSO] Office no está definido');
+  if (typeof Office === 'undefined' || !Office.auth) {
     return null;
   }
-
-  if (!Office.auth) {
-    console.log('[SSO] Office.auth no está disponible');
-    return null;
-  }
-
-  console.log('[SSO] Office.auth disponible, solicitando token...');
 
   try {
-    // Solicitar token de acceso
     const token = await Office.auth.getAccessToken({
-      allowSignInPrompt: false, // No mostrar popup de login
-      allowConsentPrompt: false, // No mostrar popup de consentimiento
-      forMSGraphAccess: false // No necesitamos Graph, solo el token básico
+      allowSignInPrompt: false,
+      allowConsentPrompt: false,
+      forMSGraphAccess: false
     });
-
-    console.log('[SSO] Token obtenido:', token ? 'Sí (longitud: ' + token.length + ')' : 'No');
 
     if (!token) {
       return null;
     }
 
-    // Decodificar el JWT para obtener claims del usuario
     const userInfo = decodeJwtPayload(token);
-    console.log('[SSO] Claims del token:', userInfo);
 
     if (userInfo) {
-      const result = {
+      return {
         name: userInfo.name || userInfo.preferred_username || 'Usuario',
         email: userInfo.preferred_username || userInfo.upn || userInfo.email || '',
         firstName: getFirstName(userInfo.name || userInfo.preferred_username || 'Usuario'),
         isAuthenticated: true,
-        source: 'sso' as const
+        source: 'sso'
       };
-      console.log('[SSO] Usuario obtenido:', result);
-      return result;
     }
-  } catch (error) {
-    console.error('[SSO] Error:', error);
+  } catch {
+    // SSO no disponible
   }
 
   return null;
@@ -116,10 +103,7 @@ function decodeJwtPayload(token: string): any {
       return null;
     }
 
-    // El payload es la segunda parte
     const payload = parts[1];
-
-    // Decodificar base64url
     const base64 = payload.replace(/-/g, '+').replace(/_/g, '/');
     const jsonPayload = decodeURIComponent(
       atob(base64)
@@ -139,7 +123,6 @@ function decodeJwtPayload(token: string): any {
  */
 function getFirstName(fullName: string): string {
   if (!fullName) return 'Usuario';
-
   const parts = fullName.trim().split(/\s+/);
   return parts[0] || 'Usuario';
 }
