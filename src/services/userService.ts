@@ -18,10 +18,15 @@ let cachedUser: UserInfo | null = null;
  * Intenta SSO primero, luego fallback
  */
 export async function getUserInfo(): Promise<UserInfo> {
+  console.log('[UserService] getUserInfo() llamado');
+
   // Retornar cache si existe
   if (cachedUser) {
+    console.log('[UserService] Retornando usuario cacheado:', cachedUser);
     return cachedUser;
   }
+
+  console.log('[UserService] No hay cache, intentando SSO...');
 
   // Intentar SSO primero
   try {
@@ -30,8 +35,8 @@ export async function getUserInfo(): Promise<UserInfo> {
       cachedUser = ssoUser;
       return ssoUser;
     }
-  } catch {
-    // SSO no disponible
+  } catch (error) {
+    console.error('[UserService] Error en SSO:', error);
   }
 
   // Fallback: usuario desconocido
