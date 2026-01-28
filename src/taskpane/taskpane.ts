@@ -126,13 +126,10 @@ const el = {
   ragActiveIndicator: () => document.getElementById("ragActiveIndicator") as HTMLElement,
   fileInput: () => document.getElementById("fileInput") as HTMLInputElement,
   attachedFilesContainer: () => document.getElementById("attachedFilesContainer") as HTMLElement,
-  // Image attachment elements
-  attachImageBtn: () => document.getElementById("attachImageBtn") as HTMLButtonElement,
-  imageInput: () => document.getElementById("imageInput") as HTMLInputElement,
+  // Image attachment elements (solo para pegar con Ctrl+V)
   imagePreviewContainer: () => document.getElementById("imagePreviewContainer") as HTMLElement,
   imagePreview: () => document.getElementById("imagePreview") as HTMLImageElement,
   removeImageBtn: () => document.getElementById("removeImageBtn") as HTMLButtonElement,
-  inputTextZone: () => document.querySelector(".input-text-zone") as HTMLElement,
 };
 
 // Referencia al popup menu (se crea dinámicamente)
@@ -3264,15 +3261,10 @@ function handleImageFile(file: File): void {
 function showImagePreview(dataUrl: string): void {
   const container = el.imagePreviewContainer();
   const preview = el.imagePreview();
-  const attachBtn = el.attachImageBtn();
 
   if (container && preview) {
     preview.src = dataUrl;
     container.style.display = "block";
-  }
-
-  if (attachBtn) {
-    attachBtn.classList.add("has-image");
   }
 }
 
@@ -3282,7 +3274,6 @@ function showImagePreview(dataUrl: string): void {
 function hideImagePreview(): void {
   const container = el.imagePreviewContainer();
   const preview = el.imagePreview();
-  const attachBtn = el.attachImageBtn();
 
   if (container) {
     container.style.display = "none";
@@ -3290,10 +3281,6 @@ function hideImagePreview(): void {
 
   if (preview) {
     preview.src = "";
-  }
-
-  if (attachBtn) {
-    attachBtn.classList.remove("has-image");
   }
 
   state.attachedImage = null;
@@ -3321,97 +3308,20 @@ function handlePaste(e: ClipboardEvent): void {
 }
 
 /**
- * Maneja el evento dragover
- */
-function handleDragOver(e: DragEvent): void {
-  e.preventDefault();
-  e.stopPropagation();
-
-  const zone = el.inputTextZone();
-  if (zone && !zone.classList.contains("drag-over")) {
-    zone.classList.add("drag-over");
-  }
-}
-
-/**
- * Maneja el evento dragleave
- */
-function handleDragLeave(e: DragEvent): void {
-  e.preventDefault();
-  e.stopPropagation();
-
-  const zone = el.inputTextZone();
-  if (zone) {
-    zone.classList.remove("drag-over");
-  }
-}
-
-/**
- * Maneja el evento drop (para imágenes)
- */
-function handleDrop(e: DragEvent): void {
-  e.preventDefault();
-  e.stopPropagation();
-
-  const zone = el.inputTextZone();
-  if (zone) {
-    zone.classList.remove("drag-over");
-  }
-
-  const files = e.dataTransfer?.files;
-  if (files && files.length > 0) {
-    const file = files[0];
-    if (file.type.startsWith("image/")) {
-      handleImageFile(file);
-    } else {
-      showToast("Solo se permiten imágenes", "error");
-    }
-  }
-}
-
-/**
- * Configura los event listeners para adjuntar imágenes
+ * Configura los event listeners para pegar imágenes
  */
 function setupImageAttachmentListeners(): void {
   const input = el.userInput();
-  const imageInput = el.imageInput();
-  const attachBtn = el.attachImageBtn();
   const removeBtn = el.removeImageBtn();
-  const inputZone = el.inputTextZone();
 
-  // Paste en el textarea
+  // Paste en el textarea (Ctrl+V o clic derecho pegar)
   if (input) {
     input.addEventListener("paste", handlePaste);
-  }
-
-  // Click en botón adjuntar
-  if (attachBtn && imageInput) {
-    attachBtn.addEventListener("click", () => {
-      imageInput.click();
-    });
-  }
-
-  // Selección de archivo
-  if (imageInput) {
-    imageInput.addEventListener("change", () => {
-      const file = imageInput.files?.[0];
-      if (file) {
-        handleImageFile(file);
-        imageInput.value = ""; // Reset para permitir seleccionar mismo archivo
-      }
-    });
   }
 
   // Botón quitar imagen
   if (removeBtn) {
     removeBtn.addEventListener("click", hideImagePreview);
-  }
-
-  // Drag & Drop
-  if (inputZone) {
-    inputZone.addEventListener("dragover", handleDragOver);
-    inputZone.addEventListener("dragleave", handleDragLeave);
-    inputZone.addEventListener("drop", handleDrop);
   }
 }
 

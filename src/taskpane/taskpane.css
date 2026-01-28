@@ -1729,20 +1729,3 @@ body {
 .remove-image-btn i {
   font-size: 10px;
 }
-
-/* Drag over effect */
-.input-text-zone.drag-over {
-  background: var(--accent-light);
-  border: 2px dashed var(--accent);
-  border-radius: var(--radius);
-}
-
-.input-text-zone.drag-over textarea {
-  pointer-events: none;
-}
-
-/* Attach button active state */
-#attachImageBtn.has-image {
-  color: var(--accent);
-  background: var(--accent-light);
-}
