@@ -2209,18 +2209,19 @@ Las siguientes acciones se ejecutaron sin error técnico, pero los datos no se e
 
 ${validationDetails}
 
-IMPORTANTE:
-1. La acción NO produjo error, pero las celdas están vacías o con valores incorrectos
-2. Esto puede ocurrir por:
-   - Rango incorrecto o fuera del área visible
-   - Valores en formato incorrecto
-   - Conflicto con protección de celdas
-   - El rango ya tenía datos y se movió a otro lugar
+IMPORTANTE - CAUSA COMÚN:
+- Si creaste una tabla de datos (ventas, gastos, etc.), probablemente faltaron los VALORES NUMÉRICOS
+- Crear solo estructura (encabezados + etiquetas) SIN datos numéricos cuenta como FALLO
+- DEBES incluir valores de ejemplo en TODAS las celdas de datos
 
-Por favor, genera las acciones corregidas asegurándote de:
-1. Usar rangos válidos y accesibles
-2. Verificar que el formato de datos sea correcto
-3. Si es una tabla de datos, usa "values" como array 2D correcto
+ACCIONES REQUERIDAS:
+1. Revisa que el array "values" tenga datos en TODAS las celdas, no solo encabezados
+2. Si es tabla de ventas/gastos/inventario, incluye NÚMEROS DE EJEMPLO realistas
+3. NO dejes celdas vacías ("") donde deberían ir valores numéricos
+4. Genera valores variados (no todos iguales)
+
+Ejemplo correcto para tabla de ventas:
+[["Mes","2024","2025"],["Enero",8500,9200],["Febrero",7800,8900],...] ← TODOS con valores
 
 Solicitud original del usuario: ${state.lastUserMessage || "No disponible"}`;
 

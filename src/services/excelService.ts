@@ -2615,6 +2615,20 @@ export class ExcelService {
         };
       }
 
+      // Verificar celdas vacías parciales (tabla incompleta)
+      // Si hay más del 30% de celdas vacías en una acción write con múltiples filas, es sospechoso
+      if (action.type === "write" && action.values && action.values.length > 1) {
+        const emptyRatio = emptyCount / totalCells;
+        if (emptyRatio > 0.3 && emptyCount > 3) {
+          // Más del 30% vacías y más de 3 celdas vacías = tabla incompleta
+          return {
+            passed: false,
+            message: `Tabla incompleta: ${emptyCount}/${totalCells} celdas vacías (${Math.round(emptyRatio * 100)}%). Se esperaban valores en todas las celdas de datos.`,
+            actualValues,
+          };
+        }
+      }
+
       // Si hay datos, verificar que no sean todos errores (para fórmulas)
       if (action.type === "formula") {
         let errorCount = 0;
