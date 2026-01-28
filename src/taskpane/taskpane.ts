@@ -2560,16 +2560,20 @@ async function sendMessage(): Promise<void> {
   // Permitir envío si hay mensaje O imagen
   if ((!userMessage && !attachedImage) || state.isProcessing) return;
 
+  // IMPORTANTE: Marcar como procesando INMEDIATAMENTE para evitar doble ejecución
+  state.isProcessing = true;
+
   const validation = validateConfig();
   if (!validation.isValid) {
     showToast("Configura tu API Key en config.ts", "error");
+    state.isProcessing = false;
     return;
   }
 
   // Guardar mensaje para posibles correcciones posteriores
   state.lastUserMessage = userMessage;
 
-  // Clear input and image
+  // Clear input and image DESPUÉS de capturar los valores
   input.value = "";
   autoResizeTextarea();
   hideImagePreview(); // Clear attached image
@@ -2581,7 +2585,7 @@ async function sendMessage(): Promise<void> {
     ? `${userMessage || "Analiza esta imagen"} [📷 Imagen adjunta]`
     : userMessage;
   addMessage("user", displayMessage);
-  setLoading(true);
+  setLoading(true); // Esto ya no cambia isProcessing porque ya está en true
 
   try {
     // Agregar contexto de selección y rango usado automáticamente
