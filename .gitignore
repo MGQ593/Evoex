@@ -97,6 +97,9 @@ certs/
 # Claude Code
 .claude/
 
+# Manifest (contiene ID único, no compartir públicamente)
+manifest.xml
+
 # Archivos temporales
 nul
 docs/
