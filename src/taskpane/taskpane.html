@@ -70,20 +70,35 @@
       <!-- Área de entrada unificada -->
       <footer class="input-area">
         <div class="unified-input-box">
+          <!-- Vista previa de imagen adjunta -->
+          <div id="imagePreviewContainer" class="image-preview-container" style="display: none;">
+            <div class="image-preview-wrapper">
+              <img id="imagePreview" class="image-preview" alt="Vista previa" />
+              <button id="removeImageBtn" class="remove-image-btn" title="Quitar imagen">
+                <i class="ms-Icon ms-Icon--Cancel" aria-hidden="true"></i>
+              </button>
+            </div>
+          </div>
+
           <!-- Zona de texto -->
           <div class="input-text-zone">
             <textarea
               id="userInput"
               class="input-field"
-              placeholder="Pregunta algo..."
+              placeholder="Pregunta algo o pega una imagen..."
               rows="1"
               aria-label="Mensaje"
             ></textarea>
+            <!-- Input oculto para seleccionar archivos -->
+            <input type="file" id="imageInput" accept="image/*" style="display: none;" />
           </div>
           
           <!-- Zona de botones -->
           <div class="input-buttons-zone">
             <div class="buttons-left">
+              <button id="attachImageBtn" class="icon-btn" title="Adjuntar imagen (o pega con Ctrl+V)">
+                <i class="ms-Icon ms-Icon--Attach" aria-hidden="true"></i>
+              </button>
               <button id="moreOptionsBtn" class="icon-btn" title="Más opciones">
                 <i class="ms-Icon ms-Icon--Add" aria-hidden="true"></i>
               </button>

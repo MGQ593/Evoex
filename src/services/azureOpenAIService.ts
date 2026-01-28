@@ -7,11 +7,24 @@ import { config, validateConfig, defaultModelId, getModelById } from "../config/
 import type { ExcelAction, FormatOptions } from "./excelService";
 
 /**
+ * Parte de contenido multimodal (texto o imagen)
+ */
+interface ContentPart {
+  type: "text" | "image_url";
+  text?: string;
+  image_url?: {
+    url: string;
+    detail?: "auto" | "low" | "high";
+  };
+}
+
+/**
  * Estructura de un mensaje en la conversación
+ * Content puede ser string (texto simple) o array (multimodal con imagen)
  */
 export interface ChatMessage {
   role: "system" | "user" | "assistant";
-  content: string;
+  content: string | ContentPart[];
 }
 
 /**
@@ -940,8 +953,15 @@ export class AzureOpenAIService {
 
   /**
    * Envía un mensaje y obtiene respuesta estructurada con posibles acciones
+   * @param userMessage - Mensaje del usuario
+   * @param excelContext - Contexto de Excel (opcional)
+   * @param image - Imagen adjunta en base64 (opcional)
    */
-  async sendMessageStructured(userMessage: string, excelContext?: string): Promise<StructuredResponse> {
+  async sendMessageStructured(
+    userMessage: string,
+    excelContext?: string,
+    image?: { base64: string; mimeType: string }
+  ): Promise<StructuredResponse> {
     // Validar configuración
     const validation = validateConfig();
     if (!validation.isValid) {
@@ -956,11 +976,45 @@ export class AzureOpenAIService {
       fullMessage = `Contexto de Excel (selección actual):\n\`\`\`\n${excelContext}\n\`\`\`\n\nPetición: ${userMessage}`;
     }
 
-    // Agregar mensaje del usuario al historial
-    this.conversationHistory.push({
-      role: "user",
-      content: fullMessage,
-    });
+    // Si hay imagen, agregar instrucciones especiales
+    if (image) {
+      fullMessage = `[IMAGEN ADJUNTA - Analiza el contenido visual]
+
+${fullMessage}
+
+INSTRUCCIONES PARA IMAGEN:
+1. Analiza cuidadosamente la imagen adjunta
+2. Si contiene datos (tabla, lista, números), extráelos con precisión
+3. Si el usuario pide crear una tabla, usa los datos que ves en la imagen
+4. Si es una captura de Excel/documento, transcribe los datos fielmente
+5. Genera acciones "write" con los datos extraídos de la imagen`;
+    }
+
+    // Agregar mensaje del usuario al historial (con o sin imagen)
+    if (image) {
+      // Formato multimodal para GPT-4o Vision
+      this.conversationHistory.push({
+        role: "user",
+        content: [
+          {
+            type: "text",
+            text: fullMessage
+          },
+          {
+            type: "image_url",
+            image_url: {
+              url: image.base64, // data:image/xxx;base64,... format
+              detail: "high"
+            }
+          }
+        ]
+      } as ChatMessage);
+    } else {
+      this.conversationHistory.push({
+        role: "user",
+        content: fullMessage,
+      });
+    }
 
     this.trimHistory();
 

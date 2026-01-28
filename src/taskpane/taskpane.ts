@@ -51,6 +51,12 @@ interface AttachedFile {
   sheetNames?: string[]; // Nombres de las hojas
 }
 
+interface AttachedImage {
+  base64: string;
+  mimeType: string;
+  name: string;
+}
+
 interface AppState {
   currentSelection: SelectionInfo | null;
   currentExcelContext: string | null;
@@ -63,6 +69,7 @@ interface AppState {
   ragEnabled: boolean;
   attachedFiles: AttachedFile[];
   currentUser: UserInfo | null;
+  attachedImage: AttachedImage | null;
 }
 
 const state: AppState = {
@@ -76,7 +83,8 @@ const state: AppState = {
   webSearchEnabled: localStorage.getItem("webSearchEnabled") === "true",
   ragEnabled: localStorage.getItem("ragEnabled") === "true",
   attachedFiles: [],
-  currentUser: null
+  currentUser: null,
+  attachedImage: null
 };
 
 // URL del proxy para procesamiento de archivos
@@ -118,6 +126,13 @@ const el = {
   ragActiveIndicator: () => document.getElementById("ragActiveIndicator") as HTMLElement,
   fileInput: () => document.getElementById("fileInput") as HTMLInputElement,
   attachedFilesContainer: () => document.getElementById("attachedFilesContainer") as HTMLElement,
+  // Image attachment elements
+  attachImageBtn: () => document.getElementById("attachImageBtn") as HTMLButtonElement,
+  imageInput: () => document.getElementById("imageInput") as HTMLInputElement,
+  imagePreviewContainer: () => document.getElementById("imagePreviewContainer") as HTMLElement,
+  imagePreview: () => document.getElementById("imagePreview") as HTMLImageElement,
+  removeImageBtn: () => document.getElementById("removeImageBtn") as HTMLButtonElement,
+  inputTextZone: () => document.querySelector(".input-text-zone") as HTMLElement,
 };
 
 // Referencia al popup menu (se crea dinámicamente)
@@ -183,8 +198,10 @@ function updateInputState(): void {
   const input = el.userInput();
   const sendBtn = el.sendBtn();
   const hasText = input.value.trim().length > 0;
+  const hasImage = state.attachedImage !== null;
 
-  sendBtn.disabled = !hasText || state.isProcessing;
+  // Habilitar envío si hay texto O si hay imagen adjunta
+  sendBtn.disabled = (!hasText && !hasImage) || state.isProcessing;
   el.modelSelector().disabled = state.isProcessing;
 }
 
@@ -2541,8 +2558,10 @@ async function sendMessageSilent(message: string, displayMessage?: string): Prom
 async function sendMessage(): Promise<void> {
   const input = el.userInput();
   const userMessage = input.value.trim();
+  const attachedImage = state.attachedImage;
 
-  if (!userMessage || state.isProcessing) return;
+  // Permitir envío si hay mensaje O imagen
+  if ((!userMessage && !attachedImage) || state.isProcessing) return;
 
   const validation = validateConfig();
   if (!validation.isValid) {
@@ -2553,13 +2572,18 @@ async function sendMessage(): Promise<void> {
   // Guardar mensaje para posibles correcciones posteriores
   state.lastUserMessage = userMessage;
 
-  // Clear input
+  // Clear input and image
   input.value = "";
   autoResizeTextarea();
+  hideImagePreview(); // Clear attached image
   updateInputState();
   hidePendingActions();
 
-  addMessage("user", userMessage);
+  // Show message with image indicator if present
+  const displayMessage = attachedImage
+    ? `${userMessage || "Analiza esta imagen"} [📷 Imagen adjunta]`
+    : userMessage;
+  addMessage("user", displayMessage);
   setLoading(true);
 
   try {
@@ -2679,8 +2703,12 @@ async function sendMessage(): Promise<void> {
     }
 
     let response: StructuredResponse = await azureOpenAIService.sendMessageStructured(
-      userMessage,
-      context || undefined
+      userMessage || "Analiza esta imagen y extrae los datos que puedas ver",
+      context || undefined,
+      attachedImage ? {
+        base64: attachedImage.base64,
+        mimeType: attachedImage.mimeType
+      } : undefined
     );
 
     // Verificar si hay acciones de conteo por categoría (countByCategory) - MÁS EFICIENTE
@@ -3191,6 +3219,202 @@ function clearHistory(): void {
   showToast("Nueva conversación", "info");
 }
 
+// ===== Image Attachment =====
+
+/**
+ * Procesa un archivo de imagen y lo adjunta
+ */
+function handleImageFile(file: File): void {
+  if (!file.type.startsWith("image/")) {
+    showToast("Solo se permiten imágenes", "error");
+    return;
+  }
+
+  // Limitar tamaño (max 10MB)
+  if (file.size > 10 * 1024 * 1024) {
+    showToast("La imagen es demasiado grande (máx 10MB)", "error");
+    return;
+  }
+
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const result = e.target?.result as string;
+    if (result) {
+      // Guardar imagen en estado
+      state.attachedImage = {
+        base64: result,
+        mimeType: file.type,
+        name: file.name
+      };
+
+      // Mostrar vista previa
+      showImagePreview(result);
+      updateInputState();
+    }
+  };
+  reader.onerror = () => {
+    showToast("Error al leer la imagen", "error");
+  };
+  reader.readAsDataURL(file);
+}
+
+/**
+ * Muestra la vista previa de la imagen adjunta
+ */
+function showImagePreview(dataUrl: string): void {
+  const container = el.imagePreviewContainer();
+  const preview = el.imagePreview();
+  const attachBtn = el.attachImageBtn();
+
+  if (container && preview) {
+    preview.src = dataUrl;
+    container.style.display = "block";
+  }
+
+  if (attachBtn) {
+    attachBtn.classList.add("has-image");
+  }
+}
+
+/**
+ * Oculta y limpia la vista previa de imagen
+ */
+function hideImagePreview(): void {
+  const container = el.imagePreviewContainer();
+  const preview = el.imagePreview();
+  const attachBtn = el.attachImageBtn();
+
+  if (container) {
+    container.style.display = "none";
+  }
+
+  if (preview) {
+    preview.src = "";
+  }
+
+  if (attachBtn) {
+    attachBtn.classList.remove("has-image");
+  }
+
+  state.attachedImage = null;
+  updateInputState();
+}
+
+/**
+ * Maneja el evento de pegar (para imágenes)
+ */
+function handlePaste(e: ClipboardEvent): void {
+  const items = e.clipboardData?.items;
+  if (!items) return;
+
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i];
+    if (item.type.startsWith("image/")) {
+      e.preventDefault();
+      const file = item.getAsFile();
+      if (file) {
+        handleImageFile(file);
+      }
+      return;
+    }
+  }
+}
+
+/**
+ * Maneja el evento dragover
+ */
+function handleDragOver(e: DragEvent): void {
+  e.preventDefault();
+  e.stopPropagation();
+
+  const zone = el.inputTextZone();
+  if (zone && !zone.classList.contains("drag-over")) {
+    zone.classList.add("drag-over");
+  }
+}
+
+/**
+ * Maneja el evento dragleave
+ */
+function handleDragLeave(e: DragEvent): void {
+  e.preventDefault();
+  e.stopPropagation();
+
+  const zone = el.inputTextZone();
+  if (zone) {
+    zone.classList.remove("drag-over");
+  }
+}
+
+/**
+ * Maneja el evento drop (para imágenes)
+ */
+function handleDrop(e: DragEvent): void {
+  e.preventDefault();
+  e.stopPropagation();
+
+  const zone = el.inputTextZone();
+  if (zone) {
+    zone.classList.remove("drag-over");
+  }
+
+  const files = e.dataTransfer?.files;
+  if (files && files.length > 0) {
+    const file = files[0];
+    if (file.type.startsWith("image/")) {
+      handleImageFile(file);
+    } else {
+      showToast("Solo se permiten imágenes", "error");
+    }
+  }
+}
+
+/**
+ * Configura los event listeners para adjuntar imágenes
+ */
+function setupImageAttachmentListeners(): void {
+  const input = el.userInput();
+  const imageInput = el.imageInput();
+  const attachBtn = el.attachImageBtn();
+  const removeBtn = el.removeImageBtn();
+  const inputZone = el.inputTextZone();
+
+  // Paste en el textarea
+  if (input) {
+    input.addEventListener("paste", handlePaste);
+  }
+
+  // Click en botón adjuntar
+  if (attachBtn && imageInput) {
+    attachBtn.addEventListener("click", () => {
+      imageInput.click();
+    });
+  }
+
+  // Selección de archivo
+  if (imageInput) {
+    imageInput.addEventListener("change", () => {
+      const file = imageInput.files?.[0];
+      if (file) {
+        handleImageFile(file);
+        imageInput.value = ""; // Reset para permitir seleccionar mismo archivo
+      }
+    });
+  }
+
+  // Botón quitar imagen
+  if (removeBtn) {
+    removeBtn.addEventListener("click", hideImagePreview);
+  }
+
+  // Drag & Drop
+  if (inputZone) {
+    inputZone.addEventListener("dragover", handleDragOver);
+    inputZone.addEventListener("dragleave", handleDragLeave);
+    inputZone.addEventListener("drop", handleDrop);
+  }
+}
+
 // ===== Event Listeners =====
 
 function setupEventListeners(): void {
@@ -3241,6 +3465,9 @@ function setupEventListeners(): void {
       }
     }
   });
+
+  // Image attachment listeners
+  setupImageAttachmentListeners();
 }
 
 /**
