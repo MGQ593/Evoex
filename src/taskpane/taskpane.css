@@ -1729,3 +1729,31 @@ body {
 .remove-image-btn i {
   font-size: 10px;
 }
+
+/* ===== Voice Button ===== */
+.voice-btn {
+  transition: all 0.2s ease;
+}
+
+.voice-btn.listening {
+  color: var(--error);
+  animation: pulse 1s infinite;
+}
+
+.voice-btn.listening i {
+  color: var(--error);
+}
+
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.1);
+  }
+}
+
+.voice-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

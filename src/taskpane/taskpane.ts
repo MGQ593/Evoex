@@ -130,10 +130,61 @@ const el = {
   imagePreviewContainer: () => document.getElementById("imagePreviewContainer") as HTMLElement,
   imagePreview: () => document.getElementById("imagePreview") as HTMLImageElement,
   removeImageBtn: () => document.getElementById("removeImageBtn") as HTMLButtonElement,
+  // Voice button
+  voiceBtn: () => document.getElementById("voiceBtn") as HTMLButtonElement,
 };
 
 // Referencia al popup menu (se crea dinámicamente)
 let optionsPopup: HTMLElement | null = null;
+
+// ===== Speech Recognition =====
+
+// Tipos para Web Speech API
+interface SpeechRecognitionEvent extends Event {
+  results: SpeechRecognitionResultList;
+  resultIndex: number;
+}
+
+interface SpeechRecognitionResultList {
+  length: number;
+  item(index: number): SpeechRecognitionResult;
+  [index: number]: SpeechRecognitionResult;
+}
+
+interface SpeechRecognitionResult {
+  length: number;
+  item(index: number): SpeechRecognitionAlternative;
+  [index: number]: SpeechRecognitionAlternative;
+  isFinal: boolean;
+}
+
+interface SpeechRecognitionAlternative {
+  transcript: string;
+  confidence: number;
+}
+
+interface SpeechRecognition extends EventTarget {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  start(): void;
+  stop(): void;
+  abort(): void;
+  onstart: ((this: SpeechRecognition, ev: Event) => void) | null;
+  onend: ((this: SpeechRecognition, ev: Event) => void) | null;
+  onerror: ((this: SpeechRecognition, ev: Event & { error: string }) => void) | null;
+  onresult: ((this: SpeechRecognition, ev: SpeechRecognitionEvent) => void) | null;
+}
+
+declare global {
+  interface Window {
+    SpeechRecognition: new () => SpeechRecognition;
+    webkitSpeechRecognition: new () => SpeechRecognition;
+  }
+}
+
+let speechRecognition: SpeechRecognition | null = null;
+let isListening = false;
 
 // ===== Toast =====
 
@@ -3329,6 +3380,136 @@ function setupImageAttachmentListeners(): void {
   }
 }
 
+// ===== Voice Recognition =====
+
+/**
+ * Inicializa el reconocimiento de voz
+ */
+function initSpeechRecognition(): boolean {
+  const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+  if (!SpeechRecognitionAPI) {
+    console.warn("[Voice] Web Speech API no disponible");
+    return false;
+  }
+
+  speechRecognition = new SpeechRecognitionAPI();
+  speechRecognition.continuous = true;
+  speechRecognition.interimResults = true;
+  speechRecognition.lang = "es-ES"; // Español
+
+  speechRecognition.onstart = () => {
+    isListening = true;
+    updateVoiceButtonState();
+    showToast("🎤 Escuchando... Habla ahora", "info");
+  };
+
+  speechRecognition.onend = () => {
+    isListening = false;
+    updateVoiceButtonState();
+  };
+
+  speechRecognition.onerror = (event) => {
+    isListening = false;
+    updateVoiceButtonState();
+
+    if (event.error === "not-allowed") {
+      showToast("Permiso de micrófono denegado", "error");
+    } else if (event.error === "no-speech") {
+      showToast("No se detectó voz", "info");
+    } else {
+      showToast(`Error de voz: ${event.error}`, "error");
+    }
+  };
+
+  speechRecognition.onresult = (event) => {
+    const input = el.userInput();
+    let finalTranscript = "";
+    let interimTranscript = "";
+
+    for (let i = event.resultIndex; i < event.results.length; i++) {
+      const result = event.results[i];
+      if (result.isFinal) {
+        finalTranscript += result[0].transcript;
+      } else {
+        interimTranscript += result[0].transcript;
+      }
+    }
+
+    // Mostrar transcripción en tiempo real
+    if (finalTranscript) {
+      // Agregar al texto existente
+      const currentText = input.value;
+      const newText = currentText ? `${currentText} ${finalTranscript}` : finalTranscript;
+      input.value = newText;
+      autoResizeTextarea();
+      updateInputState();
+    }
+  };
+
+  return true;
+}
+
+/**
+ * Actualiza el estado visual del botón de voz
+ */
+function updateVoiceButtonState(): void {
+  const btn = el.voiceBtn();
+  if (!btn) return;
+
+  if (isListening) {
+    btn.classList.add("listening");
+    btn.title = "Detener grabación";
+  } else {
+    btn.classList.remove("listening");
+    btn.title = "Voz a texto";
+  }
+}
+
+/**
+ * Inicia o detiene el reconocimiento de voz
+ */
+function toggleVoiceRecognition(): void {
+  if (!speechRecognition) {
+    const initialized = initSpeechRecognition();
+    if (!initialized) {
+      showToast("Tu navegador no soporta reconocimiento de voz", "error");
+      return;
+    }
+  }
+
+  if (isListening) {
+    speechRecognition?.stop();
+    showToast("Grabación detenida", "info");
+  } else {
+    try {
+      speechRecognition?.start();
+    } catch (error) {
+      // Si ya está corriendo, reiniciar
+      speechRecognition?.stop();
+      setTimeout(() => speechRecognition?.start(), 100);
+    }
+  }
+}
+
+/**
+ * Configura los event listeners para voz
+ */
+function setupVoiceListeners(): void {
+  const voiceBtn = el.voiceBtn();
+
+  if (voiceBtn) {
+    // Click para toggle
+    voiceBtn.addEventListener("click", toggleVoiceRecognition);
+
+    // Verificar si está disponible y ocultar si no
+    const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognitionAPI) {
+      voiceBtn.style.display = "none";
+    }
+  }
+}
+
 // ===== Event Listeners =====
 
 function setupEventListeners(): void {
@@ -3382,6 +3563,9 @@ function setupEventListeners(): void {
 
   // Image attachment listeners
   setupImageAttachmentListeners();
+
+  // Voice recognition listeners
+  setupVoiceListeners();
 }
 
 /**
