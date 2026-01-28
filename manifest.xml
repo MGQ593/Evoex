@@ -24,15 +24,15 @@
   <Description DefaultValue="Evoex - Asistente de IA para Excel con Azure OpenAI"/>
 
   <!-- URL del icono del add-in (128x128) -->
-  <IconUrl DefaultValue="https://localhost:3000/assets/icon-80.png"/>
-  <HighResolutionIconUrl DefaultValue="https://localhost:3000/assets/icon-80.png"/>
+  <IconUrl DefaultValue="https://evoexia.0hidyn.easypanel.host/assets/icon-80.png"/>
+  <HighResolutionIconUrl DefaultValue="https://evoexia.0hidyn.easypanel.host/assets/icon-80.png"/>
 
   <!-- URL de soporte -->
-  <SupportUrl DefaultValue="https://localhost:3000/taskpane.html"/>
+  <SupportUrl DefaultValue="https://evoexia.0hidyn.easypanel.host/taskpane.html"/>
 
   <!-- Dominios permitidos -->
   <AppDomains>
-    <AppDomain>https://localhost:3000</AppDomain>
+    <AppDomain>https://evoexia.0hidyn.easypanel.host</AppDomain>
   </AppDomains>
 
   <!-- Hosts soportados - Solo Excel -->
@@ -49,7 +49,7 @@
 
   <!-- Configuración por defecto del taskpane -->
   <DefaultSettings>
-    <SourceLocation DefaultValue="https://localhost:3000/taskpane.html"/>
+    <SourceLocation DefaultValue="https://evoexia.0hidyn.easypanel.host/taskpane.html"/>
   </DefaultSettings>
 
   <!-- Permisos requeridos -->
@@ -107,13 +107,13 @@
 
     <Resources>
       <bt:Images>
-        <bt:Image id="Icon.16x16" DefaultValue="https://localhost:3000/assets/icon-16.png"/>
-        <bt:Image id="Icon.32x32" DefaultValue="https://localhost:3000/assets/icon-32.png"/>
-        <bt:Image id="Icon.80x80" DefaultValue="https://localhost:3000/assets/icon-80.png"/>
+        <bt:Image id="Icon.16x16" DefaultValue="https://evoexia.0hidyn.easypanel.host/assets/icon-16.png"/>
+        <bt:Image id="Icon.32x32" DefaultValue="https://evoexia.0hidyn.easypanel.host/assets/icon-32.png"/>
+        <bt:Image id="Icon.80x80" DefaultValue="https://evoexia.0hidyn.easypanel.host/assets/icon-80.png"/>
       </bt:Images>
       <bt:Urls>
-        <bt:Url id="GetStarted.LearnMoreUrl" DefaultValue="https://localhost:3000/taskpane.html"/>
-        <bt:Url id="Taskpane.Url" DefaultValue="https://localhost:3000/taskpane.html"/>
+        <bt:Url id="GetStarted.LearnMoreUrl" DefaultValue="https://evoexia.0hidyn.easypanel.host/taskpane.html"/>
+        <bt:Url id="Taskpane.Url" DefaultValue="https://evoexia.0hidyn.easypanel.host/taskpane.html"/>
       </bt:Urls>
       <bt:ShortStrings>
         <bt:String id="GetStarted.Title" DefaultValue="Evoex"/>
